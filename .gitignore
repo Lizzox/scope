@@ -1,0 +1,23 @@
+# Dependencies and builds
+node_modules/
+.next/
+out/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Secrets and local overrides
+.env
+.env.*
+!.env.example
+
+# Runtime data and backups
+uploads/
+backups/
+
+# Logs and editor files
+*.log
+npm-debug.log*
+.DS_Store
+.idea/
+.vscode/

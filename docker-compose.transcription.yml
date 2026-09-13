@@ -1,0 +1,22 @@
+services:
+  worker:
+    environment:
+      SCOPE_TRANSCRIBER_URL: http://transcriber:9000
+      SCOPE_TRANSCRIBER_FORMAT: whisper-asr
+    depends_on:
+      transcriber:
+        condition: service_started
+
+  transcriber:
+    image: onerahmet/openai-whisper-asr-webservice:v1.9.1
+    restart: unless-stopped
+    profiles: ["transcription"]
+    environment:
+      ASR_ENGINE: faster_whisper
+      ASR_MODEL: ${SCOPE_TRANSCRIBER_MODEL:-base}
+      ASR_DEVICE: cpu
+    volumes:
+      - scope_transcriber_models:/root/.cache
+
+volumes:
+  scope_transcriber_models:

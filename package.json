@@ -1,0 +1,44 @@
+{
+  "name": "scope-planner",
+  "version": "0.2.0",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build && node scripts/prepare-standalone.mjs",
+    "start": "node .next/standalone/server.js",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "node scripts/migrate.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "check": "npm run typecheck && npm test && npm audit --omit=dev --audit-level=high"
+  },
+  "engines": {
+    "node": ">=24 <27"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1131.0",
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "drizzle-orm": "^0.45.2",
+    "lucide-react": "^0.544.0",
+    "next": "^16.3.4",
+    "nodemailer": "^10.0.8",
+    "postgres": "^3.4.7",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "server-only": "^0.0.1",
+    "web-push": "^3.6.7",
+    "zod": "^4.1.5"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "@types/nodemailer": "^8.0.1",
+    "@types/react": "^19.1.12",
+    "@types/react-dom": "^19.1.9",
+    "@types/web-push": "^3.6.4",
+    "drizzle-kit": "^0.31.4",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}

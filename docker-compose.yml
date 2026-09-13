@@ -1,0 +1,118 @@
+services:
+  app:
+    build:
+      context: .
+      args:
+        SCOPE_VERSION: ${SCOPE_VERSION:-0.2.0}
+        VCS_REF: ${SCOPE_VCS_REF:-local}
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 30s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    ports:
+      - "${SCOPE_PORT:-3000}:3000"
+    environment:
+      DATABASE_URL: postgres://scope:${POSTGRES_PASSWORD}@postgres:5432/scope
+      SCOPE_ENCRYPTION_KEY: ${SCOPE_ENCRYPTION_KEY}
+      SCOPE_SESSION_SECRET: ${SCOPE_SESSION_SECRET}
+      SCOPE_SETUP_TOKEN: ${SCOPE_SETUP_TOKEN}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+      SCOPE_UPLOAD_DIR: /data/uploads
+      SCOPE_MAX_UPLOAD_BYTES: ${SCOPE_MAX_UPLOAD_BYTES:-262144000}
+      SCOPE_TRANSCRIBER_URL: ${SCOPE_TRANSCRIBER_URL:-}
+      SCOPE_S3_ENDPOINT: ${SCOPE_S3_ENDPOINT:-}
+      SCOPE_S3_REGION: ${SCOPE_S3_REGION:-us-east-1}
+      SCOPE_S3_BUCKET: ${SCOPE_S3_BUCKET:-}
+      SCOPE_S3_ACCESS_KEY: ${SCOPE_S3_ACCESS_KEY:-}
+      SCOPE_S3_SECRET_KEY: ${SCOPE_S3_SECRET_KEY:-}
+      SCOPE_S3_FORCE_PATH_STYLE: ${SCOPE_S3_FORCE_PATH_STYLE:-false}
+      SCOPE_VAPID_PUBLIC_KEY: ${SCOPE_VAPID_PUBLIC_KEY:-}
+      SCOPE_VAPID_PRIVATE_KEY: ${SCOPE_VAPID_PRIVATE_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:3000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    volumes:
+      - scope_uploads:/data/uploads
+  worker:
+    build:
+      context: .
+      args:
+        SCOPE_VERSION: ${SCOPE_VERSION:-0.2.0}
+        VCS_REF: ${SCOPE_VCS_REF:-local}
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 30s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    command: ["node", "scripts/worker.mjs"]
+    environment:
+      DATABASE_URL: postgres://scope:${POSTGRES_PASSWORD}@postgres:5432/scope
+      SCOPE_ENCRYPTION_KEY: ${SCOPE_ENCRYPTION_KEY}
+      SCOPE_UPLOAD_DIR: /data/uploads
+      SCOPE_TRANSCRIBER_URL: ${SCOPE_TRANSCRIBER_URL:-}
+      SCOPE_S3_ENDPOINT: ${SCOPE_S3_ENDPOINT:-}
+      SCOPE_S3_REGION: ${SCOPE_S3_REGION:-us-east-1}
+      SCOPE_S3_BUCKET: ${SCOPE_S3_BUCKET:-}
+      SCOPE_S3_ACCESS_KEY: ${SCOPE_S3_ACCESS_KEY:-}
+      SCOPE_S3_SECRET_KEY: ${SCOPE_S3_SECRET_KEY:-}
+      SCOPE_S3_FORCE_PATH_STYLE: ${SCOPE_S3_FORCE_PATH_STYLE:-false}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+      SCOPE_SMTP_HOST: ${SCOPE_SMTP_HOST:-}
+      SCOPE_SMTP_PORT: ${SCOPE_SMTP_PORT:-587}
+      SCOPE_SMTP_SECURE: ${SCOPE_SMTP_SECURE:-false}
+      SCOPE_SMTP_USER: ${SCOPE_SMTP_USER:-}
+      SCOPE_SMTP_PASSWORD: ${SCOPE_SMTP_PASSWORD:-}
+      SCOPE_SMTP_FROM: ${SCOPE_SMTP_FROM:-}
+      SCOPE_VAPID_PUBLIC_KEY: ${SCOPE_VAPID_PUBLIC_KEY:-}
+      SCOPE_VAPID_PRIVATE_KEY: ${SCOPE_VAPID_PRIVATE_KEY:-}
+      SCOPE_VAPID_SUBJECT: ${SCOPE_VAPID_SUBJECT:-mailto:admin@localhost}
+    depends_on:
+      app:
+        condition: service_healthy
+    volumes:
+      - scope_uploads:/data/uploads
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    stop_grace_period: 60s
+    environment:
+      POSTGRES_DB: scope
+      POSTGRES_USER: scope
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - scope_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U scope -d scope"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  scope_postgres:
+  scope_uploads:

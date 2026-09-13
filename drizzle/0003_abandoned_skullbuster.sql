@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "task_recurrence_occurrence_unique" ON "tasks" USING btree ("recurrence_rule_id","recurrence_occurrence_at");
