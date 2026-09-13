@@ -410,6 +410,31 @@ export const meetingSummaryRequestSchema = z.object({
   providerConfigId: uuidSchema,
   model: z.string().min(1).max(200),
 });
+export const meetingIntegrationCreateSchema = z.discriminatedUnion("provider", [
+  z.object({
+    workspaceId: uuidSchema,
+    projectId: uuidSchema.nullable().optional(),
+    provider: z.literal("discord"),
+    name: z.string().trim().min(1).max(100).default("Scope Discord Bot"),
+    applicationId: z.string().regex(/^\d{16,24}$/),
+    botToken: z.string().min(30).max(300),
+  }),
+  z.object({
+    workspaceId: uuidSchema,
+    projectId: uuidSchema.nullable().optional(),
+    provider: z.literal("teams"),
+    name: z.string().trim().min(1).max(100).default("Scope Teams Bot"),
+    tenantId: uuidSchema,
+    clientId: uuidSchema,
+    clientSecret: z.string().min(8).max(500),
+    organizerUserId: uuidSchema,
+  }),
+]);
+export const teamsTranscriptImportSchema = z.object({
+  onlineMeetingId: z.string().trim().min(5).max(1000),
+  title: z.string().trim().min(1).max(240),
+  consentConfirmed: z.literal(true),
+});
 export const adminSettingsSchema = z
   .object({
     storageProvider: z.enum(["local", "s3"]).optional(),

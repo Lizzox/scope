@@ -1,8 +1,18 @@
 services:
+  app:
+    environment:
+      SCOPE_TRANSCRIBER_URL: http://transcriber:9000
+      SCOPE_TRANSCRIBER_FORMAT: whisper-asr
+      SCOPE_TRANSCRIBER_MODEL: ${SCOPE_TRANSCRIBER_MODEL:-base}
+    depends_on:
+      transcriber:
+        condition: service_started
+
   worker:
     environment:
       SCOPE_TRANSCRIBER_URL: http://transcriber:9000
       SCOPE_TRANSCRIBER_FORMAT: whisper-asr
+      SCOPE_TRANSCRIBER_MODEL: ${SCOPE_TRANSCRIBER_MODEL:-base}
     depends_on:
       transcriber:
         condition: service_started
@@ -10,11 +20,29 @@ services:
   transcriber:
     image: onerahmet/openai-whisper-asr-webservice:v1.9.1
     restart: unless-stopped
+    init: true
     profiles: ["transcription"]
     environment:
       ASR_ENGINE: faster_whisper
       ASR_MODEL: ${SCOPE_TRANSCRIBER_MODEL:-base}
       ASR_DEVICE: cpu
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9000/docs')",
+        ]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     volumes:
       - scope_transcriber_models:/root/.cache
 

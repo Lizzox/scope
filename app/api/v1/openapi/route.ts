@@ -92,6 +92,13 @@ const document = {
         responses: response("Summary and proposals"),
       },
     },
+    "/meeting-integrations": collection("meeting bot integrations"),
+    "/meeting-integrations/{integrationId}/teams-import": {
+      post: {
+        summary: "Import an official Microsoft Teams transcript",
+        responses: { "201": { description: "Meeting created" } },
+      },
+    },
     "/ai/providers/{providerId}/models": {
       post: { summary: "Fetch provider models", responses: response("Models") },
     },

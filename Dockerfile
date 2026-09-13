@@ -33,6 +33,7 @@ COPY --from=builder --chown=scope:scope /app/.next/static ./.next/static
 COPY --from=builder --chown=scope:scope /app/drizzle ./drizzle
 COPY --from=builder --chown=scope:scope /app/scripts/migrate.mjs ./scripts/migrate.mjs
 COPY --from=builder --chown=scope:scope /app/scripts/worker.mjs ./scripts/worker.mjs
+COPY --from=builder --chown=scope:scope /app/scripts/discord-bot.mjs ./scripts/discord-bot.mjs
 COPY --from=builder --chown=scope:scope /app/scripts/validate-env.mjs ./scripts/validate-env.mjs
 RUN mkdir -p /data/uploads && chown -R scope:scope /data
 USER scope

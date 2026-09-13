@@ -21,6 +21,7 @@ Scope is a focused, self-hosted project planner for individuals and teams. It co
 - Notification center with optional SMTP and standards-based Web Push delivery
 - No-code event automations with run history and retryable PostgreSQL jobs
 - Consent-gated meeting recording/upload, editable transcripts and AI summaries
+- Self-hosted Discord voice capture and official Microsoft Teams transcript import
 - Owner-only self-hosting health page with database, worker, storage and backup status
 
 The UI loads its workspace, projects and tasks from `/api/v1` and writes task changes back with optimistic concurrency control. Planner features remain usable when no AI provider is configured.
@@ -51,15 +52,17 @@ The backup includes PostgreSQL, uploads, checksums and a protected copy of `.env
 
 Uploads are stored in the `scope_uploads` Docker volume by default. An S3-compatible store can be selected from the owner page after its credentials have been supplied through the environment variables documented in `.env.example`.
 
-### Optional local meeting transcription
+### Local meeting transcription
 
-Scope can call any OpenAI-compatible transcription endpoint. For a fully local CPU-based Whisper service, start the supplied optional Compose profile:
+New installations enable the bundled CPU-based Whisper service automatically. Existing installations can enable it once by adding `COMPOSE_FILE=docker-compose.yml:docker-compose.transcription.yml` and `COMPOSE_PROFILES=transcription` to `.env`, then starting the stack again:
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.transcription.yml --profile transcription up -d
 ```
 
-The first transcription downloads the selected model and can therefore take longer. Change `SCOPE_TRANSCRIBER_MODEL=base` in `.env` to another Whisper model when the host has enough memory. The bundled optional service uses the maintained Whisper ASR Webservice image; recordings remain inside the deployment network.
+The first installation downloads a large container image, while the first transcription downloads the selected model and can therefore take longer. Change `SCOPE_TRANSCRIBER_MODEL=base` in `.env` to another Whisper model when the host has enough memory. Scope can alternatively call an OpenAI-compatible transcription endpoint. Recordings remain inside the deployment network when the bundled service is used.
+
+Discord and Microsoft Teams setup is documented in [Meeting integrations](./docs/meeting-bots.md). Discord uses a self-hosted voice bot; Teams uses Microsoft's supported post-meeting transcript API rather than persisting raw meeting media.
 
 ### Optional notifications
 

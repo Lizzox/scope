@@ -508,6 +508,36 @@ export const meetings = pgTable("meetings", {
   ...timestamps,
 });
 
+export const meetingIntegrations = pgTable(
+  "meeting_integrations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id").references(() => projects.id, {
+      onDelete: "set null",
+    }),
+    provider: text("provider").notNull(),
+    name: text("name").notNull(),
+    enabled: boolean("enabled").notNull().default(true),
+    config: jsonb("config").notNull().default({}),
+    encryptedCredentials: text("encrypted_credentials").notNull(),
+    lastConnectedAt: timestamp("last_connected_at", { withTimezone: true }),
+    lastError: text("last_error"),
+    createdBy: uuid("created_by")
+      .notNull()
+      .references(() => users.id),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("meeting_integration_workspace_provider_unique").on(
+      table.workspaceId,
+      table.provider,
+    ),
+  ],
+);
+
 export const meetingTranscriptSegments = pgTable(
   "meeting_transcript_segments",
   {

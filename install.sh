@@ -29,10 +29,23 @@ if [ ! -f .env ]; then
     echo "SCOPE_SETUP_TOKEN=${SCOPE_SETUP_TOKEN}"
     echo "SCOPE_PORT=3000"
     echo "NEXT_PUBLIC_APP_URL=http://localhost:3000"
+    echo "COMPOSE_FILE=docker-compose.yml:docker-compose.transcription.yml"
+    echo "COMPOSE_PROFILES=transcription"
+    echo "SCOPE_TRANSCRIBER_MODEL=base"
   } > .env
   echo "Sichere Konfiguration wurde in .env angelegt."
 else
   echo "Vorhandene .env wird beibehalten."
+fi
+
+if ! grep -q '^COMPOSE_FILE=' .env; then
+  printf '%s\n' 'COMPOSE_FILE=docker-compose.yml:docker-compose.transcription.yml' >> .env
+fi
+if ! grep -q '^COMPOSE_PROFILES=' .env; then
+  printf '%s\n' 'COMPOSE_PROFILES=transcription' >> .env
+fi
+if ! grep -q '^SCOPE_TRANSCRIBER_MODEL=' .env; then
+  printf '%s\n' 'SCOPE_TRANSCRIBER_MODEL=base' >> .env
 fi
 
 docker compose up -d --build

@@ -1299,10 +1299,9 @@ kbd {
 .task-list-head,
 .task-row {
   display: grid;
-  grid-template-columns: minmax(280px, 1.8fr) minmax(110px, 0.6fr) minmax(
-      90px,
-      0.5fr
-    ) minmax(90px, 0.5fr) 50px;
+  grid-template-columns:
+    minmax(280px, 1.8fr) minmax(110px, 0.6fr) minmax(90px, 0.5fr)
+    minmax(90px, 0.5fr) 50px;
   align-items: center;
   text-align: left;
 }
@@ -2959,6 +2958,76 @@ kbd {
   text-align: left;
   color: var(--text);
   background: transparent;
+}
+.meeting-error {
+  display: block;
+  margin: 5px 2px 9px;
+  color: var(--danger);
+  font-size: 10px;
+}
+.meeting-integrations {
+  margin-top: 16px;
+}
+.integration-cards {
+  display: grid;
+  gap: 8px;
+}
+.integration-cards article {
+  min-height: 54px;
+  padding: 9px 11px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-soft);
+}
+.integration-cards strong,
+.integration-cards small {
+  display: block;
+}
+.integration-cards small {
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: 10px;
+}
+.integration-setup,
+.teams-import {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.integration-setup > p {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.55;
+}
+.integration-setup code {
+  color: var(--text);
+}
+.integration-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.integration-setup label,
+.teams-import label {
+  color: var(--text-muted);
+  font-size: 10px;
+}
+.integration-setup input,
+.teams-import input {
+  width: 100%;
+  height: 36px;
+  margin-top: 5px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+.teams-import > strong {
+  display: block;
+  margin-bottom: 10px;
 }
 .meeting-list strong,
 .meeting-list small {

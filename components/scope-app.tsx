@@ -593,6 +593,7 @@ export function ScopeApp() {
             workspaceId={workspaceId}
             projects={projects}
             currentProjectId={currentProject?.id ?? ""}
+            canAdmin={canAdmin}
           />
         ) : nav === "automations" ? (
           <AutomationsHub
@@ -2861,6 +2862,16 @@ function NotificationCenter({
   );
 }
 
+type MeetingIntegrationRecord = {
+  id: string;
+  provider: "discord" | "teams";
+  name: string;
+  projectId?: string | null;
+  lastConnectedAt?: string | null;
+  lastError?: string | null;
+  inviteUrl?: string | null;
+};
+
 type MeetingRecord = {
   id: string;
   title: string;
@@ -2875,15 +2886,43 @@ type MeetingRecord = {
   };
   createdAt: string;
   recordingAttachmentId?: string | null;
+  errorCode?: string | null;
 };
+
+function meetingStatusLabel(status: string) {
+  return (
+    {
+      recording: "Aufnahme läuft",
+      uploaded: "Bereit",
+      transcribing: "Transkription läuft",
+      summarizing: "Zusammenfassung läuft",
+      review: "Zur Prüfung",
+      completed: "Abgeschlossen",
+      failed: "Fehlgeschlagen",
+    }[status] ?? status
+  );
+}
+
+function meetingErrorLabel(code: string) {
+  if (code === "transcriber_not_configured")
+    return "Lokaler Whisper-Dienst ist nicht aktiviert.";
+  if (code.startsWith("transcriber_http_"))
+    return `Transkriptionsdienst antwortete mit ${code.replace("transcriber_http_", "HTTP ")}.`;
+  if (code === "transcriber_invalid_response")
+    return "Der Transkriptionsdienst lieferte kein lesbares Transkript.";
+  return "Transkription fehlgeschlagen. Bitte erneut versuchen.";
+}
+
 function MeetingsHub({
   workspaceId,
   projects,
   currentProjectId,
+  canAdmin,
 }: {
   workspaceId: string;
   projects: BackendProject[];
   currentProjectId: string;
+  canAdmin: boolean;
 }) {
   const [meetings, setMeetings] = useState<MeetingRecord[]>([]);
   const [providers, setProviders] = useState<PublicProvider[]>([]);
@@ -2898,18 +2937,44 @@ function MeetingsHub({
   const [model, setModel] = useState("");
   const [recording, setRecording] = useState(false);
   const [error, setError] = useState("");
+  const [integrations, setIntegrations] = useState<MeetingIntegrationRecord[]>(
+    [],
+  );
+  const [integrationProvider, setIntegrationProvider] = useState<
+    "discord" | "teams"
+  >("discord");
+  const [integrationFields, setIntegrationFields] = useState({
+    applicationId: "",
+    botToken: "",
+    tenantId: "",
+    clientId: "",
+    clientSecret: "",
+    organizerUserId: "",
+  });
+  const [teamsImport, setTeamsImport] = useState({
+    integrationId: "",
+    onlineMeetingId: "",
+    title: "",
+    consent: false,
+  });
   const recorder = useRef<MediaRecorder | null>(null);
   const chunks = useRef<Blob[]>([]);
   const activeMeeting = useRef<string>("");
   const load = async () => {
-    const [meetingResponse, providerResponse] = await Promise.all([
-      fetch(`/api/v1/meetings?workspaceId=${workspaceId}`, {
-        cache: "no-store",
-      }),
-      fetch(`/api/v1/ai/providers?workspaceId=${workspaceId}`, {
-        cache: "no-store",
-      }),
-    ]);
+    const [meetingResponse, providerResponse, integrationResponse] =
+      await Promise.all([
+        fetch(`/api/v1/meetings?workspaceId=${workspaceId}`, {
+          cache: "no-store",
+        }),
+        fetch(`/api/v1/ai/providers?workspaceId=${workspaceId}`, {
+          cache: "no-store",
+        }),
+        canAdmin
+          ? fetch(`/api/v1/meeting-integrations?workspaceId=${workspaceId}`, {
+              cache: "no-store",
+            })
+          : Promise.resolve(null),
+      ]);
     const meetingPayload = await meetingResponse.json();
     const providerPayload = await providerResponse.json();
     if (meetingResponse.ok) setMeetings(meetingPayload.data);
@@ -2923,10 +2988,27 @@ function MeetingsHub({
         setModel(available[0].models[0]);
       }
     }
+    if (integrationResponse?.ok) {
+      const payload = await integrationResponse.json();
+      setIntegrations(payload.data);
+      const teams = (payload.data as MeetingIntegrationRecord[]).find(
+        (item) => item.provider === "teams",
+      );
+      if (teams && !teamsImport.integrationId)
+        setTeamsImport((current) => ({
+          ...current,
+          integrationId: teams.id,
+        }));
+    }
   };
   useEffect(() => {
     void load();
   }, [workspaceId]);
+  useEffect(() => {
+    if (!meetings.some((meeting) => meeting.status === "transcribing")) return;
+    const timer = window.setInterval(() => void load(), 2000);
+    return () => window.clearInterval(timer);
+  }, [meetings]);
   const upload = async (meetingId: string, media: File) => {
     const form = new FormData();
     form.set("workspaceId", workspaceId);
@@ -3055,6 +3137,75 @@ function MeetingsHub({
         payload.error?.message ?? "Zusammenfassung fehlgeschlagen",
       );
     setSelected(payload.data.meeting);
+    await load();
+  };
+  const connectIntegration = async () => {
+    setError("");
+    const response = await fetch("/api/v1/meeting-integrations", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        workspaceId,
+        projectId: projectId || null,
+        provider: integrationProvider,
+        name:
+          integrationProvider === "discord"
+            ? "Scope Discord Bot"
+            : "Scope Teams Bot",
+        ...(integrationProvider === "discord"
+          ? {
+              applicationId: integrationFields.applicationId,
+              botToken: integrationFields.botToken,
+            }
+          : {
+              tenantId: integrationFields.tenantId,
+              clientId: integrationFields.clientId,
+              clientSecret: integrationFields.clientSecret,
+              organizerUserId: integrationFields.organizerUserId,
+            }),
+      }),
+    });
+    const payload = await response.json();
+    if (!response.ok)
+      return setError(
+        payload.error?.message ?? "Bot-Verbindung konnte nicht geprüft werden.",
+      );
+    setIntegrationFields({
+      applicationId: "",
+      botToken: "",
+      tenantId: "",
+      clientId: "",
+      clientSecret: "",
+      organizerUserId: "",
+    });
+    await load();
+  };
+  const importTeamsTranscript = async () => {
+    setError("");
+    const response = await fetch(
+      `/api/v1/meeting-integrations/${teamsImport.integrationId}/teams-import`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          onlineMeetingId: teamsImport.onlineMeetingId,
+          title: teamsImport.title,
+          consentConfirmed: teamsImport.consent,
+        }),
+      },
+    );
+    const payload = await response.json();
+    if (!response.ok)
+      return setError(
+        payload.error?.message ??
+          "Teams-Transkript konnte nicht importiert werden.",
+      );
+    setTeamsImport((current) => ({
+      ...current,
+      onlineMeetingId: "",
+      title: "",
+      consent: false,
+    }));
     await load();
   };
   const provider = providers.find((item) => item.id === providerId);
@@ -3192,21 +3343,248 @@ function MeetingsHub({
                       }).format(new Date(meeting.createdAt))}
                     </small>
                   </span>
-                  <i>{meeting.status}</i>
+                  <i>{meetingStatusLabel(meeting.status)}</i>
                 </button>
                 {meeting.recordingAttachmentId && !meeting.transcript && (
                   <button
                     className="secondary-button compact"
+                    disabled={meeting.status === "transcribing"}
                     onClick={() => void transcribe(meeting)}
                   >
-                    Transkribieren
+                    {meeting.status === "transcribing"
+                      ? "Wird transkribiert …"
+                      : meeting.status === "failed"
+                        ? "Erneut transkribieren"
+                        : "Transkribieren"}
                   </button>
+                )}
+                {meeting.errorCode && (
+                  <small className="meeting-error">
+                    {meetingErrorLabel(meeting.errorCode)}
+                  </small>
                 )}
               </article>
             ))}
           </div>
         </section>
       </div>
+      {canAdmin && (
+        <section className="feature-card meeting-integrations">
+          <div className="section-heading">
+            <div>
+              <h2>
+                <Bot size={17} /> Meeting-Bots
+              </h2>
+              <small>
+                Eigene Discord- oder Microsoft-Anwendung sicher mit Scope
+                verbinden
+              </small>
+            </div>
+          </div>
+          <div className="integration-cards">
+            {integrations.map((integration) => (
+              <article key={integration.id}>
+                <div>
+                  <strong>{integration.name}</strong>
+                  <small>
+                    {integration.lastConnectedAt
+                      ? "Zugangsdaten geprüft"
+                      : "Nicht verbunden"}
+                  </small>
+                </div>
+                {integration.inviteUrl && (
+                  <a
+                    className="secondary-button compact"
+                    href={integration.inviteUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Zu Discord einladen <ExternalLink size={14} />
+                  </a>
+                )}
+              </article>
+            ))}
+          </div>
+          <div className="integration-setup">
+            <div className="segmented">
+              <button
+                className={integrationProvider === "discord" ? "active" : ""}
+                onClick={() => setIntegrationProvider("discord")}
+              >
+                Discord
+              </button>
+              <button
+                className={integrationProvider === "teams" ? "active" : ""}
+                onClick={() => setIntegrationProvider("teams")}
+              >
+                Microsoft Teams
+              </button>
+            </div>
+            {integrationProvider === "discord" ? (
+              <>
+                <p>
+                  Erstelle im Discord Developer Portal eine Anwendung mit Bot.
+                  Scope prüft den Token und erzeugt danach den Einladungslink.
+                  Im Voice-Channel steuerst du ihn mit <code>/scope-start</code>
+                  und <code>/scope-stop</code>.
+                </p>
+                <div className="field-row">
+                  <label>
+                    Application ID
+                    <input
+                      autoComplete="off"
+                      data-1p-ignore
+                      data-lpignore="true"
+                      inputMode="numeric"
+                      name="scope-discord-application-id"
+                      placeholder="123456789012345678"
+                      value={integrationFields.applicationId}
+                      onChange={(event) =>
+                        setIntegrationFields((current) => ({
+                          ...current,
+                          applicationId: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                  <label>
+                    Bot Token
+                    <input
+                      type="password"
+                      autoComplete="new-password"
+                      data-1p-ignore
+                      data-lpignore="true"
+                      name="scope-discord-bot-token"
+                      value={integrationFields.botToken}
+                      onChange={(event) =>
+                        setIntegrationFields((current) => ({
+                          ...current,
+                          botToken: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                </div>
+              </>
+            ) : (
+              <>
+                <p>
+                  Teams stellt Scope das offizielle Meeting-Transkript über
+                  Microsoft Graph bereit. Erforderlich sind
+                  <code> OnlineMeetingTranscript.Read.All</code> und eine
+                  Application Access Policy für den Organisator.
+                </p>
+                <div className="integration-grid">
+                  {(["tenantId", "clientId", "organizerUserId"] as const).map(
+                    (field) => (
+                      <label key={field}>
+                        {field === "tenantId"
+                          ? "Tenant ID"
+                          : field === "clientId"
+                            ? "Client ID"
+                            : "Organizer User ID"}
+                        <input
+                          autoComplete="off"
+                          data-1p-ignore
+                          data-lpignore="true"
+                          name={`scope-teams-${field}`}
+                          value={integrationFields[field]}
+                          onChange={(event) =>
+                            setIntegrationFields((current) => ({
+                              ...current,
+                              [field]: event.target.value,
+                            }))
+                          }
+                        />
+                      </label>
+                    ),
+                  )}
+                  <label>
+                    Client Secret
+                    <input
+                      type="password"
+                      autoComplete="new-password"
+                      data-1p-ignore
+                      data-lpignore="true"
+                      name="scope-teams-client-secret"
+                      value={integrationFields.clientSecret}
+                      onChange={(event) =>
+                        setIntegrationFields((current) => ({
+                          ...current,
+                          clientSecret: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                </div>
+              </>
+            )}
+            <button
+              className="primary-button compact"
+              onClick={() => void connectIntegration()}
+            >
+              Verbindung prüfen und speichern
+            </button>
+          </div>
+          {integrations.some((item) => item.provider === "teams") && (
+            <div className="teams-import">
+              <strong>Teams-Transkript übernehmen</strong>
+              <div className="integration-grid">
+                <label>
+                  Meeting-Link oder Online Meeting ID
+                  <input
+                    value={teamsImport.onlineMeetingId}
+                    onChange={(event) =>
+                      setTeamsImport((current) => ({
+                        ...current,
+                        onlineMeetingId: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+                <label>
+                  Titel in Scope
+                  <input
+                    value={teamsImport.title}
+                    onChange={(event) =>
+                      setTeamsImport((current) => ({
+                        ...current,
+                        title: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+              </div>
+              <label className="consent-check">
+                <input
+                  type="checkbox"
+                  checked={teamsImport.consent}
+                  onChange={(event) =>
+                    setTeamsImport((current) => ({
+                      ...current,
+                      consent: event.target.checked,
+                    }))
+                  }
+                />
+                <span>
+                  Alle Teilnehmenden haben der Verarbeitung zugestimmt.
+                </span>
+              </label>
+              <button
+                className="secondary-button compact"
+                disabled={
+                  !teamsImport.onlineMeetingId ||
+                  !teamsImport.title ||
+                  !teamsImport.consent
+                }
+                onClick={() => void importTeamsTranscript()}
+              >
+                Teams-Transkript importieren
+              </button>
+            </div>
+          )}
+        </section>
+      )}
       {selected && (
         <section className="feature-card meeting-editor">
           <div className="section-heading">

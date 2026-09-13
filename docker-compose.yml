@@ -92,6 +92,35 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+  discord-bot:
+    build:
+      context: .
+      args:
+        SCOPE_VERSION: ${SCOPE_VERSION:-0.2.0}
+        VCS_REF: ${SCOPE_VCS_REF:-local}
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 30s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    command: ["node", "scripts/discord-bot.mjs"]
+    environment:
+      DATABASE_URL: postgres://scope:${POSTGRES_PASSWORD}@postgres:5432/scope
+      SCOPE_ENCRYPTION_KEY: ${SCOPE_ENCRYPTION_KEY}
+      SCOPE_TRANSCRIBER_URL: ${SCOPE_TRANSCRIBER_URL:-http://transcriber:9000}
+      SCOPE_TRANSCRIBER_API_KEY: ${SCOPE_TRANSCRIBER_API_KEY:-}
+      SCOPE_TRANSCRIBER_MODEL: ${SCOPE_TRANSCRIBER_MODEL:-base}
+      SCOPE_TRANSCRIBER_FORMAT: ${SCOPE_TRANSCRIBER_FORMAT:-whisper-asr}
+    depends_on:
+      app:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
   postgres:
     image: postgres:17-alpine
     restart: unless-stopped
