@@ -555,12 +555,14 @@ export function ScopeApp() {
       />
       <main className="workspace">
         <Topbar
+          nav={nav}
           projectName={currentProject?.name ?? "Projekt"}
           userName={account.name}
           locale={account.locale}
           sidebarOpen={sidebarOpen}
           onOpenSidebar={() => setSidebarOpen(true)}
           onCommand={() => setCommandOpen(true)}
+          onProjects={() => setNav("projects")}
           onAssistant={() => setAssistantOpen(true)}
           onNotifications={() => setNotificationsOpen(true)}
           unread={unreadNotifications}
@@ -1506,28 +1508,43 @@ function NavButton({
 }
 
 function Topbar({
+  nav,
   projectName,
   userName,
   locale,
   sidebarOpen,
   onOpenSidebar,
   onCommand,
+  onProjects,
   onAssistant,
   onNotifications,
   unread,
   onShare,
 }: {
+  nav: string;
   projectName: string;
   userName: string;
   locale: "de" | "en";
   sidebarOpen: boolean;
   onOpenSidebar: () => void;
   onCommand: () => void;
+  onProjects: () => void;
   onAssistant: () => void;
   onNotifications: () => void;
   unread: number;
   onShare?: () => void;
 }) {
+  const sectionLabel =
+    {
+      dashboard: "Dashboard",
+      "my-work": translate(locale, "myWork"),
+      inbox: translate(locale, "inbox"),
+      calendar: translate(locale, "calendar"),
+      meetings: "Meetings",
+      automations: "Automationen",
+      admin: "Self-Hosting",
+      projects: translate(locale, "projects"),
+    }[nav] ?? translate(locale, "projects");
   const initials = userName
     .split(/\s+/)
     .map((part) => part[0])
@@ -1545,9 +1562,23 @@ function Topbar({
             <Menu size={17} />
           </button>
         )}
-        <span>{translate(locale, "projects")}</span>
-        <span>/</span>
-        <strong>{projectName}</strong>
+        {nav === "project" ? (
+          <>
+            <button
+              type="button"
+              className="breadcrumb-link"
+              onClick={onProjects}
+            >
+              {translate(locale, "projects")}
+            </button>
+            <span className="breadcrumb-separator" aria-hidden="true">
+              /
+            </span>
+            <strong>{projectName}</strong>
+          </>
+        ) : (
+          <strong>{sectionLabel}</strong>
+        )}
       </div>
       <div className="top-actions">
         <button
